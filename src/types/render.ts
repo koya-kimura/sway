@@ -2,6 +2,8 @@ import p5 from "p5";
 import type { APCMiniMK2Manager } from "../midi/apcmini_mk2/apcMiniMk2Manager";
 import type { AudioMicManager } from "../utils/audio/audioMicManager";
 import type { CaptureManager } from "../utils/capture/captureManager";
+import type { ImageStore } from "../utils/image/imageStore";
+import type { VideoStore } from "../utils/video/videoStore";
 
 /**
  * ビジュアル描画コンテキスト。描画に必要な共通の情報をまとめたインターフェース。
@@ -14,4 +16,6 @@ export interface VisualRenderContext {
   audioManager?: AudioMicManager;
   captureManager?: CaptureManager;
   font?: p5.Font;
+  imageStore?: ImageStore;
+  videoStore?: VideoStore;
 }

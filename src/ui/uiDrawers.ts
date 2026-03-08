@@ -1,6 +1,33 @@
 import type { VisualRenderContext } from "../types/render";
+import { map } from "../utils/math/mathUtils";
+import { leapNoise } from "../utils/math/gvm";
+import { UniformRandom } from "../utils/math/uniformRandom";
 
 export type UIDrawFunction = (context: VisualRenderContext) => void;
+
+const WORDS = ["botanica", "music", "movie", "life", "nurture", "osaka", "sway", "sound", "visual", "word", "care"];
+const SWAY_LETTERS = ["S", "W", "A", "Y"];
+
+const applyFont = (context: VisualRenderContext): void => {
+  const { tex, font } = context;
+  if (font) {
+    tex.textFont(font);
+  }
+};
+
+const drawDust = (context: VisualRenderContext, count: number, alpha: number): void => {
+  const { p, tex, beat } = context;
+  tex.push();
+  tex.noStroke();
+  tex.fill(255, alpha);
+  for (let i = 0; i < count; i++) {
+    const t = i / Math.max(1, count - 1);
+    const x = (p.noise(t * 8.0, beat * 0.03) * tex.width * 1.2) - tex.width * 0.1;
+    const y = (p.noise(beat * 0.02, t * 9.0) * tex.height * 1.2) - tex.height * 0.1;
+    tex.circle(x, y, 1.0 + p.noise(t * 4.0, beat * 0.04) * 1.6);
+  }
+  tex.pop();
+};
 
 export const uiNone: UIDrawFunction = (
   context: VisualRenderContext,
@@ -10,202 +37,199 @@ export const uiNone: UIDrawFunction = (
   tex.pop();
 };
 
+export const uiWordsDrift: UIDrawFunction = (
+  context: VisualRenderContext,
+): void => {
+  const { p, tex, beat, font } = context;
+
+  drawDust(context, 220, 18);
+
+  tex.push();
+  tex.fill(255, 170);
+  tex.textAlign(p.CENTER, p.CENTER);
+  tex.textSize(Math.max(18, tex.width * 0.024));
+  if (font) tex.textFont(font);
+  for (let i = 0; i < WORDS.length; i++) {
+    const y = map(i, 0, WORDS.length - 1, tex.height * 0.2, tex.height * 0.8);
+    const m = 10;
+    const idx = (i + Math.floor(leapNoise(beat, 32, 4, i) * WORDS.length)) % WORDS.length;
+    for (let j = 0; j < m; j++) {
+      const x = map(j, 0, m - 1, tex.width * 0.05, tex.width * 0.95);
+      const drift = Math.sin(beat * 0.35 + i * 0.7 + j * 0.5) * 40;
+      tex.text(WORDS[idx], x + drift, y);
+    }
+  }
+  tex.pop();
+};
+
+export const uiWordsGrid: UIDrawFunction = (
+  context: VisualRenderContext,
+): void => {
+  const { p, tex, beat } = context;
+
+  tex.push();
+  applyFont(context);
+  tex.fill(255, 200);
+  tex.textAlign(p.CENTER, p.CENTER);
+  tex.textSize(Math.max(13, tex.width * 0.015));
+
+  const n = 4;
+  const m = 10;
+  for (let col = 0; col < n; col++) {
+    const x = map(col, 0, n - 1, tex.width * 0.12, tex.width * 0.88);
+    for (let row = 0; row < m; row++) {
+      const y = map(row, 0, m - 1, tex.height * 0.1, tex.height * 0.9);
+      const noiseOffset = Math.floor(leapNoise(beat, 8, 2, col, row) * WORDS.length);
+      const wordIndex = (row + col + noiseOffset) % WORDS.length;
+      tex.text(WORDS[wordIndex], x, y);
+    }
+  }
+  tex.pop();
+};
+
+export const uiWordsRowsAligned: UIDrawFunction = (
+  context: VisualRenderContext,
+): void => {
+  const { p, tex, beat } = context;
+
+  tex.push();
+  applyFont(context);
+  tex.fill(255, 200);
+  tex.textAlign(p.LEFT, p.CENTER);
+  tex.textSize(Math.max(12, tex.width * 0.015));
+  for (let row = 0; row < 11; row++) {
+    const y = tex.height * (0.08 + row * 0.084);
+    const base = WORDS[Math.floor(UniformRandom.rand(row * 100, Math.floor(beat*0.125)) * WORDS.length)];
+    tex.text(`${base} : ${base}  ${base} ${base} ${base} ${base} ${base}`, tex.width * 0.06, y);
+  }
+  tex.pop();
+};
+
+export const uiSwayScatter: UIDrawFunction = (
+  context: VisualRenderContext,
+): void => {
+  const { p, tex } = context;
+  drawDust(context, 180, 14);
+
+  tex.push();
+  applyFont(context);
+  tex.fill(255, 178);
+  tex.textAlign(p.CENTER, p.CENTER);
+  tex.textSize(Math.max(26, tex.width * 0.07));
+  for (let i = 0; i < 4; i++) {
+    for (let j = 0; j < 4; j++) {
+      const idx = (i * 4 + j) % SWAY_LETTERS.length;
+      const x = map(i, 0, 3, tex.width * 0.1, tex.width * 0.9);
+      const y = map(j, 0, 3, tex.height * 0.1, tex.height * 0.9);
+      tex.text(SWAY_LETTERS[idx], x, y);
+    }
+  }
+  tex.pop();
+};
+
+export const uiSwayGrid: UIDrawFunction = (
+  context: VisualRenderContext,
+): void => {
+  const { p, tex, beat } = context;
+
+  tex.push();
+  applyFont(context);
+  tex.fill(255, 230);
+  tex.textAlign(p.CENTER, p.CENTER);
+  tex.textSize(Math.max(24, tex.width * 0.034));
+  const n = 20;
+  const m = 3;
+  for (let j = 0; j < m; j++) {
+    for (let i = 0; i < n; i++) {
+      const angle = (i / n) * Math.PI * 2 + (p.millis() * 0.0002);
+      const radius = Math.min(tex.width, tex.height) * map(j, 0, m - 1, 0.15, 0.4) * map(Math.sin(beat * 0.2 + j + i * 0.1 * Math.PI * 0.125), -1, 1, 0.85, 1.15);
+      const x = tex.width / 2 + Math.cos(angle) * radius;
+      const y = tex.height / 2 + Math.sin(angle) * radius;
+      const idx = UniformRandom.rand(Math.floor(beat * 0.25) + j * 100 + i) * SWAY_LETTERS.length | 0;
+
+      tex.push();
+      tex.translate(x, y);
+      tex.rotate(angle + Math.PI / 4 + (p.millis() * 0.0001));
+      tex.text(SWAY_LETTERS[idx], 0, 0);
+      tex.pop();
+    }
+  }
+  tex.pop();
+};
+
+export const uiSwayColumnsDrift: UIDrawFunction = (
+  context: VisualRenderContext,
+): void => {
+  const { p, tex, beat } = context;
+  drawDust(context, 210, 10);
+
+  tex.push();
+  applyFont(context);
+  tex.fill(255, 140);
+  tex.textAlign(p.CENTER, p.CENTER);
+  tex.textSize(Math.max(22, tex.width * 0.02));
+
+  const n = 32;
+  const m = 18;
+
+  for (let col = 0; col < n; col++) {
+    for (let row = 0; row < m; row++) {
+      const x = map(col, 0, n - 1, tex.width * 0.05, tex.width * 0.95);
+      const y = map(row, 0, m - 1, tex.height * 0.05, tex.height * 0.95);
+      const idx = (col + row + Math.floor(leapNoise(beat, 8, 6, col, row) * SWAY_LETTERS.length)) % SWAY_LETTERS.length;
+
+      tex.text(SWAY_LETTERS[idx], x, y);
+    }
+  }
+  tex.pop();
+};
+
+export const uiSwayRowsAligned: UIDrawFunction = (
+  context: VisualRenderContext,
+): void => {
+  const { p, tex, beat } = context;
+
+  tex.push();
+  applyFont(context);
+  tex.fill(255, 200);
+  tex.textAlign(p.CENTER, p.CENTER);
+  tex.textSize(Math.max(20, tex.width * 0.028));
+
+  const n = 16;
+  const m = 4;
+  for (let col = 0; col < n; col++) {
+    const x = map(col, 0, n - 1, tex.width * 0.15, tex.width * 0.45);
+    for (let row = 0; row < m; row++) {
+      const y = map(row, 0, m - 1, tex.height * 0.2, tex.height * 0.8);
+      const base = SWAY_LETTERS[(col + row + Math.floor(leapNoise(beat, 8, 6, col, row) * SWAY_LETTERS.length)) % SWAY_LETTERS.length];
+      tex.text(base, x, y);
+    }
+  }
+  tex.pop();
+};
+
+export const uiHybridGrid: UIDrawFunction = (
+  context: VisualRenderContext,
+): void => {
+  const { p, tex } = context;
+
+  tex.push();
+  applyFont(context);
+  tex.fill(255, 200);
+  tex.textAlign(p.LEFT, p.CENTER);
+  tex.textSize(Math.max(12, tex.width * 0.014));
+  for (let row = 0; row < 8; row++) {
+    const y = tex.height * (0.14 + row * 0.1);
+    tex.text(WORDS[row % WORDS.length], tex.width * 0.08, y);
+    tex.text(SWAY_LETTERS[row % SWAY_LETTERS.length], tex.width * 0.72, y);
+  }
+  tex.pop();
+};
+
 export const uiDebug: UIDrawFunction = (
   context: VisualRenderContext,
 ): void => {
-  const { p, tex, midiManager, audioManager, captureManager, beat, font } = context;
-
-  const midiFaders = midiManager.faderValues.map((value: number) => value.toFixed(2)).join(", ");
-  const midiToggles = midiManager.faderButtonToggleState
-    .map((state: boolean) => (state ? "1" : "0"))
-    .join(" ");
-
-  const volume = audioManager?.getVolume() ?? 0;
-  const volumeNormalized = Math.min(volume * 8, 1);
-  const frequencyData = audioManager?.getFrequencyData() ?? new Uint8Array(0);
-
-  const bandDefinitions = audioManager
-    ? (
-      [
-        { label: "Sub 20-120Hz", min: 20, max: 120, threshold: 0.2 },
-        { label: "LoMid 120-400Hz", min: 120, max: 400, threshold: 0.2 },
-        { label: "Mid 400-2kHz", min: 400, max: 2000, threshold: 0.18 },
-        { label: "Hi 2k-8kHz", min: 2000, max: 8000, threshold: 0.16 },
-      ] as const
-    ).map((band) => {
-      const level = audioManager.getBandLevel(band.min, band.max);
-      const triggered = audioManager.getFrequencyTrigger(band.min, band.max, band.threshold);
-      return { ...band, level, triggered };
-    })
-    : [];
-
-  const captureReady = captureManager?.isReady() ?? false;
-  const captureTexture = captureManager?.getTexture();
-
-  const margin = tex.width * 0.04;
-  const infoWidth = tex.width * 0.48;
-  const infoX = margin;
-  const infoY = margin;
-  const lineHeight = 20;
-
-  const infoLines = [
-    "Debug Screen",
-    `Beat: ${beat.toFixed(2)}`,
-    `MIDI Page: ${midiManager.currentPageIndex}`,
-    `MIDI Faders: [${midiFaders}]`,
-    `MIDI Toggles: [${midiToggles}]`,
-    `Audio Volume RMS: ${volume.toFixed(3)}`,
-    `Spectrum Bins: ${frequencyData.length}`,
-    ...bandDefinitions.map(
-      (band) => `${band.label}: ${band.triggered ? "ON" : "off"} (lvl ${band.level.toFixed(2)})`,
-    ),
-    `Capture Ready: ${captureReady ? "yes" : "no"}`,
-    `Capture Size: ${captureTexture ? `${captureTexture.width}x${captureTexture.height}` : "n/a"
-    }`,
-  ];
-
-  const infoHeight = infoLines.length * lineHeight + 24;
-
-  tex.fill(255);
-  tex.textSize(16);
-  tex.textAlign(p.LEFT, p.TOP);
-  if (font) {
-    tex.textFont(font);
-  }
-
-  infoLines.forEach((line, index) => {
-    tex.text(line, infoX, infoY + index * lineHeight);
-  });
-  tex.pop();
-
-  // 音量メーターと帯域メーター（モノクロ）
+  const { tex } = context;
   tex.push();
-  tex.fill(255);
-  tex.textSize(14);
-  tex.textAlign(p.LEFT, p.TOP);
-  if (font) {
-    tex.textFont(font);
-  }
-
-  let meterY = infoY + infoHeight + 12;
-  const meterX = infoX;
-  const meterWidth = infoWidth;
-  const meterHeight = 14;
-
-  tex.text("Volume", meterX, meterY);
-  meterY += lineHeight * 0.7;
-
-  tex.noFill();
-  tex.stroke(150);
-  tex.rect(meterX, meterY, meterWidth, meterHeight);
-  tex.noStroke();
-  tex.fill(255);
-  tex.rect(meterX, meterY, meterWidth * volumeNormalized, meterHeight);
-
-  meterY += meterHeight + 10;
-
-  bandDefinitions.forEach((band) => {
-    tex.fill(255);
-    tex.text(`${band.label}`, meterX, meterY);
-    meterY += lineHeight * 0.7;
-
-    tex.noFill();
-    tex.stroke(150);
-    tex.rect(meterX, meterY, meterWidth, meterHeight);
-    tex.noStroke();
-    tex.fill(band.triggered ? 255 : 120);
-    tex.rect(meterX, meterY, meterWidth * Math.min(band.level, 1), meterHeight);
-
-    meterY += meterHeight + 10;
-  });
-  tex.pop();
-
-  // オーディオスペクトラム可視化
-  tex.push();
-  const spectrumHeight = tex.height * 0.22;
-  const spectrumWidth = tex.width - margin * 2;
-  const spectrumX = margin;
-  const spectrumY = tex.height - spectrumHeight - margin;
-
-  tex.noFill();
-  tex.stroke(80);
-  tex.rect(spectrumX, spectrumY, spectrumWidth, spectrumHeight);
-
-  if (frequencyData.length > 0) {
-    const barCount = 96;
-    const step = Math.max(1, Math.floor(frequencyData.length / barCount));
-    const barWidth = spectrumWidth / barCount;
-
-    tex.stroke(255);
-    tex.strokeWeight(1);
-
-    for (let i = 0; i < barCount; i++) {
-      const startIndex = i * step;
-      let sum = 0;
-      let count = 0;
-      for (let j = 0; j < step && startIndex + j < frequencyData.length; j++) {
-        sum += frequencyData[startIndex + j];
-        count += 1;
-      }
-      if (count === 0) {
-        continue;
-      }
-      const level = sum / count / 255;
-      const barHeight = spectrumHeight * level;
-      const x = spectrumX + i * barWidth;
-      tex.line(x, spectrumY + spectrumHeight, x, spectrumY + spectrumHeight - barHeight);
-    }
-  } else {
-    tex.fill(200);
-    tex.noStroke();
-    tex.textSize(14);
-    tex.textAlign(p.CENTER, p.CENTER);
-    if (font) {
-      tex.textFont(font);
-    }
-    tex.text("Audio inactive", spectrumX + spectrumWidth / 2, spectrumY + spectrumHeight / 2);
-  }
-  tex.pop();
-
-  // キャプチャプレビュー（グレースケール）
-  const previewWidth = tex.width * 0.28;
-  const previewX = tex.width - previewWidth - margin;
-  const previewY = margin;
-
-  tex.push();
-  if (captureReady && captureTexture) {
-    const aspect =
-      captureTexture.width > 0 && captureTexture.height > 0
-        ? captureTexture.height / captureTexture.width
-        : 1;
-    const previewHeight = previewWidth * aspect;
-
-    const previewImage = captureTexture.get(0, 0, captureTexture.width, captureTexture.height);
-    tex.image(previewImage, previewX, previewY, previewWidth, previewHeight);
-    tex.noFill();
-    tex.stroke(255);
-    tex.rect(previewX, previewY, previewWidth, previewHeight);
-
-    tex.fill(255);
-    tex.textSize(14);
-    tex.textAlign(p.RIGHT, p.TOP);
-    if (font) {
-      tex.textFont(font);
-    }
-    tex.text("Capture Preview", previewX + previewWidth, previewY + previewHeight + 8);
-  } else {
-    const previewHeight = previewWidth * 0.56;
-    tex.noFill();
-    tex.stroke(120);
-    tex.rect(previewX, previewY, previewWidth, previewHeight);
-
-    tex.fill(200);
-    tex.textSize(14);
-    tex.textAlign(p.CENTER, p.CENTER);
-    if (font) {
-      tex.textFont(font);
-    }
-    tex.text("Capture inactive", previewX + previewWidth / 2, previewY + previewHeight / 2);
-  }
   tex.pop();
 };
